@@ -16,20 +16,21 @@ avrdude -c usbtiny -p atmega32u4 -U lfuse:w:0xD7:m -U hfuse:w:0xD8:m -U efuse:w:
 
 ### Diagram
 
-stateDiagram
-
+```mermaid
+stateDiagram-v2
     [*] --> Setup: Power On
     Setup --> IDLE: finished setting up device
     IDLE --> IDLE: waiting for start command
-    IDLE -->  WAITING: "AT+start" received
+    IDLE --> WAITING: "AT+start" received
     WAITING --> WAITING: wait [delay] seconds
     COLLECTING --> COLLECTING: pause [interval] seconds
     FULL --> FULL: Temperature data held
     COLLECTING --> FULL: 1000 samples collected
-    WAITING --> COLLECTING: finished waited by [delay] seconds
-    FULL --> IDLE: "AT+CLEAR" received 
+    WAITING --> COLLECTING: finished waiting by [delay] seconds
+    FULL --> IDLE: "AT+CLEAR" received
     COMPUTER --> DEVICE: Command (AT...)
     DEVICE --> COMPUTER: Response (OK..., ERR...)
+```
 
 ### VScode PIO Shortcuts
 - build (ctrl+alt+b)
