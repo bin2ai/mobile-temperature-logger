@@ -134,11 +134,24 @@ void command_handler(char *at_cmd)
         }
         else if (equals(at_cmd, "+VBAT"))
         {
-            snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, analogRead(ANALOG_BATT));
+            uint16_t vbat_sum = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                vbat_sum += analogRead(ANALOG_BATT);
+                delay(10);
+            }
+
+            snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, vbat_sum / 10);
         }
         else if (equals(at_cmd, "+VUSB"))
         {
-            snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, analogRead(ANALOG_VBUS));
+            uint16_t vusb_sum = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                vusb_sum += analogRead(ANALOG_VBUS);
+                delay(10);
+            }
+            snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, vusb_sum / 10);
         }
         else if (equals(at_cmd, "+CHRG"))
         {

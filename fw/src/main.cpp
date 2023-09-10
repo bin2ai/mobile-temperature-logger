@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <EEPROM.h>
 #include "serial_handler.h"
 #include "commands.h"
 #include "globals.h"
@@ -10,6 +11,7 @@ char incomingData[MAX_BUFFER_SIZE];
 bool buttonPressed = false;
 unsigned long buttonPressStartTime = 0;
 
+unsigned long lastBlinkTime = 0;
 void blink_led()
 {
   digitalWrite(OUT_LED_L, LOW);
@@ -112,8 +114,40 @@ void check_button()
   }
 }
 
+void serial_handler()
+{
+  // Check if data is available to read from the serial port
+  if (Serial.available())
+  {
+    // allocate memory for the incoming data
+    int c = Serial.read();
+    unsigned long start_time = millis();
+    while (c >= 0 && c != '\n' && c != '\r' && strlen(incomingData) < MAX_BUFFER_SIZE - 1 && millis() - start_time < SERIAL_TIMEOUT)
+    {
+      incomingData[strlen(incomingData)] = c;
+      c = Serial.read();
+    }
+
+    if (strlen(incomingData) > 0)
+    {
+      command_handler(incomingData);
+    }
+
+    // reset the buffer
+    for (size_t i = 0; i < MAX_BUFFER_SIZE; i++)
+      incomingData[i] = '\0';
+  }
+}
+
 void loop()
 {
+
+  // if its been 10 seconds, blink
+  if (millis() - lastBlinkTime >= 10000)
+  {
+    blink_led();
+    lastBlinkTime = millis();
+  }
 
   // check if button is pressed
   check_button();
@@ -140,7 +174,7 @@ void loop()
   // Check if data is available to read from the serial port
   if (Serial.available())
   {
-    // allocate memory for the incoming data
+    serial_handler();
     int c = Serial.read();
     unsigned long start_time = millis();
     while (c >= 0 && c != '\n' && c != '\r' && strlen(incomingData) < MAX_BUFFER_SIZE - 1 && millis() - start_time < SERIAL_TIMEOUT)
