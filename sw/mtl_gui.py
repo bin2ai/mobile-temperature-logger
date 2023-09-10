@@ -300,7 +300,7 @@ class SerialConnectApp:
 
                 }
                 # go through each data value, find the closest bit_typ, and convert to temp
-                with open('temp_map.csv', newline='') as csvfile:
+                with open('temperature_bit_map.csv', newline='') as csvfile:
                     csvreader = csv.reader(csvfile)
                     # read header
                     header = next(csvreader)
@@ -420,7 +420,7 @@ class SerialConnectApp:
                         f"Error getting battery voltage: {response}")
                 # assume response is "OK+VBAT=[0-3]\r\n"
                 vbat_bit = float(response.split("=")[1].split("\r")[0])
-                vbat_voltage = float(vbat_bit/1023*(10000+75000)/(10000)*3.3)
+                vbat_voltage = float(vbat_bit/1023*(10000+75000)/(10000)*3.8)
                 # print vbat_bit, vbat_voltage
 
                 self.battery_label["text"] = f"{vbat_voltage:.2f}V"
@@ -438,9 +438,9 @@ class SerialConnectApp:
                 chrg_bit = int(response.split("=")[1].split("\r")[0])
                 battery_info = "Info: "
                 if chrg_bit == 0:
-                    battery_info = "Not charging"
-                elif chrg_bit == 1:
                     battery_info = "Charging"
+                elif chrg_bit == 1:
+                    battery_info = "Not Charging"
 
                 # get AT+STDBY
                 self.serial_port.write(b'AT+STBY\r\n')
