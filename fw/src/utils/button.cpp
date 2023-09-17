@@ -27,13 +27,12 @@ void check_button()
             // Enter an infinite loop (you can add your specific behavior here)
             while (true)
             {
-                // Your code to run in the infinite loop
             }
         }
     }
     else
     {
-        // Button is released, reset the buttonPressed flag
+        // Button is released early, reset the button press start time
         is_button_pressed = false;
     }
 }

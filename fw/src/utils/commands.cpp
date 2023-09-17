@@ -110,9 +110,9 @@ void command_handler(char *at_cmd)
         }
         else if (equals(at_cmd, "+START"))
         {
-            if (state == IDLE && is_utc_synced && index_temp_telm == 0)
+            if (state == STATE_IDLE && is_utc_synced && index_temp_telm == 0)
             {
-                state = WAITING_TO_START;
+                state = STATE_WAITING_TO_START;
                 time_start_collection = millis() / 1000 + time_collection_delay_s;
                 memset(temp_telm, 0, sizeof(temp_telm));
                 generate_response(RESPONSE_OK);
@@ -124,9 +124,9 @@ void command_handler(char *at_cmd)
         }
         else if (equals(at_cmd, "+STOP"))
         {
-            if (state == COLLECTING || state == WAITING_TO_START)
+            if (state == STATE_COLLECTING || state == STATE_WAITING_TO_START)
             {
-                state = IDLE;
+                state = STATE_IDLE;
                 generate_response(RESPONSE_OK);
             }
             else
@@ -136,7 +136,7 @@ void command_handler(char *at_cmd)
         }
         else if (equals(at_cmd, "+CLEAR"))
         {
-            if (state == IDLE || state == TELM_FULL)
+            if (state == STATE_IDLE || state == STATE_TELM_FULL)
             {
 
                 // clear epprom, first byte is the index
@@ -145,7 +145,7 @@ void command_handler(char *at_cmd)
                 index_temp_telm = 0;
 
                 generate_response(RESPONSE_OK);
-                state = IDLE;
+                state = STATE_IDLE;
             }
             else
             {
@@ -173,7 +173,7 @@ void command_handler(char *at_cmd)
             uint16_t vusb_sum = 0;
             for (int i = 0; i < 10; i++)
             {
-                vusb_sum += analogRead(PIN_ANALOG_VBUS);
+                vusb_sum += analogRead(PIN_IN_VBUS);
                 delay(10);
             }
             snprintf(response, SIZE_RESP_MAX, "%s=%d", "OK", vusb_sum / 10);

@@ -11,7 +11,7 @@ const int PIN_IN_CHARGING = 2;
 const int PIN_IN_STANDBY = 0;
 const int PIN_ANALOG_TEMP = 5;
 const int PIN_ANALOG_BATT = 4;
-const int PIN_ANALOG_VBUS = 3;
+const int PIN_IN_VBUS = A3;
 
 // Timing (in milliseconds)
 const uint8_t TIME_BUTTON_DEBOUNCE = 100;
@@ -46,10 +46,10 @@ extern uint8_t count;
 // enum states; idle, telemetry collection
 enum states
 {
-  IDLE,             // default states upon
-  WAITING_TO_START, // if delay is > 0, after start command, this will be the state
-  COLLECTING,       // after start command and delay is done, this will be the state
-  TELM_FULL         // after temperature collecting is complete, this will be the state
+  STATE_IDLE,             // default states upon
+  STATE_WAITING_TO_START, // if delay is > 0, after start command, this will be the state
+  STATE_COLLECTING,       // after start command and delay is done, this will be the state
+  STATE_TELM_FULL         // after temperature collecting is complete, this will be the state
 };
 
 // make global state variable
@@ -71,7 +71,7 @@ const uint8_t LOC_BAT_DATA_12B = 8;   // 12 bytes
 const uint8_t LOC_TELM_INDEX_2B = 20; // 2 bytes
 const uint8_t LOC_TELM_DATA_1KB = 22; // 1000 bytes
 
-/*
+/* VBAT voltage (3.3-4.2V) divided by R1 (10K) and R2 (75K) is connected to ADC pin
   if using 1.1V analog reference
     Vbat 4.2V ADC bit value is 460
     Vbat 3.7V ADC bit value is 406
@@ -92,5 +92,7 @@ extern bool is_button_pressed;
 extern unsigned long time_button_press_start;
 
 extern unsigned long time_last_blink;
+
+extern bool is_usb_connected;
 
 #endif
