@@ -8,31 +8,31 @@ void log_vbat()
     uint16_t vbat_full_bit = 0;
     for (uint8_t i = 0; i < 10; i++)
     {
-        vbat_full_bit += analogRead(ANALOG_BATT);
+        vbat_full_bit += analogRead(PIN_ANALOG_BATT);
         delay(10);
     }
 
     vbat_full_bit = vbat_full_bit / 10;
 
-    uint8_t vbat_log_size = int(vbat_full_bit / VBAT_LOG_SIZE);
+    uint8_t vbat_log_size = int(vbat_full_bit / SIZE_VBAT_TELM);
 
     // if the vbat log is empty, add the first value
-    if (vbat_log_index == VBAT_LOG_SIZE - 1)
+    if (index_vbat_telm == SIZE_VBAT_TELM - 1)
     {
         if (vbat_full_bit <= vbat_log_size)
         {
-            uint32_t current_time = int(millis() / 1000 + utc_timestamp_seconds);
-            vbat_log[vbat_log_index] = current_time;
-            vbat_log_index++;
+            uint32_t current_time = int(millis() / 1000 + time_utc_timestamp_seconds);
+            vbat_telm[index_vbat_telm] = current_time;
+            index_vbat_telm++;
         }
     }
     else
     {
-        if (vbat_full_bit <= vbat_full_bit - vbat_log_size * vbat_log_index)
+        if (vbat_full_bit <= vbat_full_bit - vbat_log_size * index_vbat_telm)
         {
-            uint32_t current_time = int(millis() / 1000 + utc_timestamp_seconds);
-            vbat_log[vbat_log_index] = current_time;
-            vbat_log_index++;
+            uint32_t current_time = int(millis() / 1000 + time_utc_timestamp_seconds);
+            vbat_telm[index_vbat_telm] = current_time;
+            index_vbat_telm++;
         }
     }
 }

@@ -2,19 +2,19 @@
 
 // Initialize global variables
 bool is_led_on = true;
-bool use_led = true;
-uint16_t telemetry[TELM_SIZE];
-uint16_t telemetry_index = 0;
+bool is_led_used = true;
+uint16_t temp_telm[SIZE_TEMP_TELM];
+uint16_t index_temp_telm = 0;
 
 uint16_t time_between_collection_s = 60;
 uint8_t time_collection_delay_s = 0;
 uint8_t samples_to_average = 10;
-bool state_collecting_telemetry = false;
+bool is_state_collecting_telemetry = false;
 
 uint8_t count = 0;
 
-char substr[MAX_SUBSTRING_SIZE];
-char response[MAX_RESPONSE_SIZE];
+char substr[SIZE_SUB_CMD_MAX];
+char response[SIZE_RESP_MAX];
 
 // Define the constants
 const char *CMD_PREFIX = "AT";
@@ -27,17 +27,18 @@ const char *RES_ERR5 = "+ERR5";
 
 states state = IDLE;
 
-unsigned long utc_timestamp_seconds = 0;
+unsigned long time_utc_timestamp_seconds = 0;
 uint32_t time_start_collection = 0;
 unsigned long local_start_time = 0;
 bool is_utc_synced = false;
 
-uint16_t vbat_log[VBAT_LOG_SIZE];
-uint8_t vbat_log_index = 0;
+uint16_t vbat_telm[SIZE_VBAT_TELM];
+uint8_t index_vbat_telm = 0;
 
-char incomingData[MAX_BUFFER_SIZE];
+char incoming_data[SIZE_BUFFER_MAX];
 
-bool buttonPressed = false;
-unsigned long buttonPressStartTime = 0;
+bool is_button_pressed = false;
+unsigned long time_button_press_start = 0;
 
-unsigned long lastBlinkTime = 0;
+unsigned long time_last_blink = 0;
+uint32_t time_local_start = 0;

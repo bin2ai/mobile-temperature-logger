@@ -6,7 +6,7 @@
 
 void collect_telmetry()
 {
-    if (telemetry_index >= TELM_SIZE)
+    if (index_temp_telm >= SIZE_TEMP_TELM)
     {
         state = TELM_FULL;
         return;
@@ -15,8 +15,8 @@ void collect_telmetry()
     // collect sample
     if (samples_to_average == 0)
     {
-        telemetry[telemetry_index] = analogRead(ANALOG_TEMP);
-        telemetry_index++;
+        temp_telm[index_temp_telm] = analogRead(PIN_ANALOG_TEMP);
+        index_temp_telm++;
     }
     else
     {
@@ -24,21 +24,21 @@ void collect_telmetry()
         // collect samples
         for (uint8_t i = 0; i < samples_to_average; i++)
         {
-            sum_of_samples += analogRead(ANALOG_TEMP);
+            sum_of_samples += analogRead(PIN_ANALOG_TEMP);
             delay(10);
         }
 
-        telemetry[telemetry_index] = sum_of_samples / samples_to_average;
+        temp_telm[index_temp_telm] = sum_of_samples / samples_to_average;
 
         // write telemetry index to eeprom
-        EEPROM.write(0, telemetry_index);
+        EEPROM.write(0, index_temp_telm);
         // divid telemetry by 2 and add to eeprom, 2 bytes into 1 byte
-        EEPROM.write(telemetry_index + 1, telemetry[telemetry_index] / 2);
-        telemetry_index++;
+        EEPROM.write(index_temp_telm + 1, temp_telm[index_temp_telm] / 2);
+        index_temp_telm++;
     }
 
     // if led on
-    if (use_led)
+    if (is_led_used)
     {
         blink_led();
     }
