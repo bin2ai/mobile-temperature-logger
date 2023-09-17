@@ -420,7 +420,7 @@ class SerialConnectApp:
                         f"Error getting battery voltage: {response}")
                 # assume response is "OK+VBAT=[0-3]\r\n"
                 vbat_bit = float(response.split("=")[1].split("\r")[0])
-                vbat_voltage = float(vbat_bit/1023*(10000+75000)/(10000)*3.8)
+                vbat_voltage = float(vbat_bit/1023*(10000+75000)/(10000)*3.3)
                 # print vbat_bit, vbat_voltage
 
                 self.battery_label["text"] = f"{vbat_voltage:.2f}V"
