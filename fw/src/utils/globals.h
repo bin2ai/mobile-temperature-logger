@@ -31,15 +31,6 @@ extern uint16_t vbat_telm[SIZE_VBAT_TELM];
 // index
 extern uint8_t index_vbat_telm;
 
-// Declare the constants as extern
-extern const char *CMD_PREFIX;
-extern const char *RES_OK;
-extern const char *RES_ERR1;
-extern const char *RES_ERR2;
-extern const char *RES_ERR3;
-extern const char *RES_ERR4;
-extern const char *RES_ERR5;
-
 // Global variables
 extern bool is_led_on;                     // true = on, false = off, default true
 extern bool is_led_used;                   // true = use led, false = don't use led, default true

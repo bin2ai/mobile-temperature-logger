@@ -16,15 +16,6 @@ uint8_t count = 0;
 char substr[SIZE_SUB_CMD_MAX];
 char response[SIZE_RESP_MAX];
 
-// Define the constants
-const char *CMD_PREFIX = "AT";
-const char *RES_OK = "+OK";
-const char *RES_ERR1 = "+ERR1";
-const char *RES_ERR2 = "+ERR2";
-const char *RES_ERR3 = "+ERR3";
-const char *RES_ERR4 = "+ERR4";
-const char *RES_ERR5 = "+ERR5";
-
 states state = IDLE;
 
 unsigned long time_utc_timestamp_seconds = 0;
