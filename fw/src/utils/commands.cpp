@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "globals.h"
+#include <EEPROM.h>
 
 void init_substr()
 {
@@ -88,12 +89,11 @@ void command_handler(char *at_cmd)
         }
         else if (equals(at_cmd, "+START"))
         {
-            if (state == IDLE && is_utc_synced)
+            if (state == IDLE && is_utc_synced && telemetry_index == 0)
             {
                 state = WAITING_TO_START;
                 time_start_collection = millis() / 1000 + time_collection_delay_s;
                 memset(telemetry, 0, sizeof(telemetry));
-                telemetry_index = 0;
                 set_response(RES_OK);
             }
             else
@@ -117,8 +117,12 @@ void command_handler(char *at_cmd)
         {
             if (state == IDLE || state == TELM_FULL)
             {
-                memset(telemetry, 0, sizeof(telemetry));
+
+                // clear epprom, first byte is the index
+                // 2nd bytes starts the data (16bit per data)
+                EEPROM.write(0, 0);
                 telemetry_index = 0;
+
                 set_response(RES_OK);
                 state = IDLE;
             }
@@ -225,6 +229,24 @@ void command_handler(char *at_cmd)
         else if (equals(at_cmd, "+LED?"))
         {
             snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, use_led);
+        }
+        // get vbat log index
+        else if (equals(at_cmd, "+VBATLOG#"))
+        {
+            snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, vbat_log_index);
+        }
+        // get vbat log per index
+        else if (starts_with(at_cmd, "+VBATLOG@"))
+        {
+            uint8_t index = atoi(at_cmd + 9);
+            if (index >= 0 && index <= VBAT_LOG_SIZE - 1)
+            {
+                snprintf(response, MAX_RESPONSE_SIZE, "%s=%d", RES_OK, vbat_log[index]);
+            }
+            else
+            {
+                set_response(RES_ERR4);
+            }
         }
         else
         {

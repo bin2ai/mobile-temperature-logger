@@ -32,4 +32,12 @@ uint32_t time_start_collection = 0;
 unsigned long local_start_time = 0;
 bool is_utc_synced = false;
 
-uint32_t sum_of_samples = 0;
+uint16_t vbat_log[VBAT_LOG_SIZE];
+uint8_t vbat_log_index = 0;
+
+char incomingData[MAX_BUFFER_SIZE];
+
+bool buttonPressed = false;
+unsigned long buttonPressStartTime = 0;
+
+unsigned long lastBlinkTime = 0;

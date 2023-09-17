@@ -27,6 +27,11 @@ extern char substr[MAX_SUBSTRING_SIZE];
 const size_t MAX_RESPONSE_SIZE = 25;
 extern char response[MAX_RESPONSE_SIZE];
 
+const size_t VBAT_LOG_SIZE = 20;
+extern uint16_t vbat_log[VBAT_LOG_SIZE];
+// index
+extern uint8_t vbat_log_index;
+
 // Declare the constants as extern
 extern const char *CMD_PREFIX;
 extern const char *RES_OK;
@@ -66,6 +71,36 @@ extern uint32_t local_start_time;
 
 extern uint32_t time_start_collection;
 
-extern uint32_t sum_of_samples;
+// eeprom addresses
+const uint8_t LOC_VERISON_1B = 0;     // 1 byte
+const uint8_t LOC_SN_1B = 1;          // 1 byte
+const uint8_t LOC_NAME_2B = 2;        // 1 byte
+const uint8_t LOC_UCT_4 = 3;          // 4 bytes
+const uint8_t LOC_BAT_INDEX_1B = 7;   // 1 byte
+const uint8_t LOC_BAT_DATA_12B = 8;   // 12 bytes
+const uint8_t LOC_TELM_INDEX_2B = 20; // 2 bytes
+const uint8_t LOC_TELM_DATA_1KB = 22; // 1000 bytes
+
+/*
+  if using 1.1V analog reference
+    Vbat 4.2V ADC bit value is 460
+    Vbat 3.7V ADC bit value is 406
+    vbat 3.3V ADC bit value is 361
+
+  if using 3.3V analog reference
+    Vbat 4.2V ADC bit value is 153
+    Vbat 3.7V ADC bit value is 135
+    vbat 3.3V ADC bit value is 120
+*/
+
+const uint16_t VBAT_1P1V_REF_4P2V = 460;
+
+const size_t MAX_BUFFER_SIZE = 30;
+extern char incomingData[MAX_BUFFER_SIZE];
+
+extern bool buttonPressed;
+extern unsigned long buttonPressStartTime;
+
+extern unsigned long lastBlinkTime;
 
 #endif
