@@ -1,6 +1,8 @@
+import math
 import csv
 import datetime
 from enum import Enum
+import os
 import sys
 import time
 import tkinter as tk
@@ -46,6 +48,19 @@ is_cmd_priority = False
 status_update_seconds = 5
 last_status_update = 0
 
+temp_data = {}  # key is temperature (F), value is bit value
+# with open "temperature_bit_map.csv"
+'''
+T_CAL,R_typ,R_min,R_max,V_typ,V_min,V_max,bit_typ,bit_min,bit_max,err_n,err_p,I max (mA),P max (mW),%-,%+
+-100,111312560,110199434,112425685,4.83,4.78,4.88,988,987,988,1,0,0.000,0.000,0.1%,0.0%
+-99,104938023,103888642,105987403,4.83,4.78,4.88,988,987,988,1,0,0.000,0.000,0.1%,0.0%
+-98,98960803,97971195,99950411,4.83,4.78,4.88,988,987,988,1,0,0.000,0.000,0.1%,0.0%
+'''
+with open('temperature_bit_map.csv', newline='') as csvfile:
+    reader = csv.DictReader(csvfile)
+    for row in reader:
+        temp_data[int(row['T_CAL'])] = int(row['bit_typ'])
+
 
 def reset_data():
     global data
@@ -54,8 +69,8 @@ def reset_data():
     for i in range(data_size):
         data[i] = 0
 
-# Function to list available COM ports
 
+# Function to list available COM ports
 
 def list_available_ports():
     ports = serial.tools.list_ports.comports()
@@ -116,7 +131,7 @@ def serial_worker():
             if selected_port == "":
                 continue
             # Open and configure the serial port
-            with serial.Serial(selected_port, 115200, timeout=0.25) as ser:
+            with serial.Serial(selected_port, 115200, timeout=1) as ser:
                 # Send the command over the serial port
                 ser.write(command.encode())
 
@@ -206,39 +221,76 @@ def serial_worker():
                             state_button.config(state=tk.DISABLED)
                             # save button disable
                             save_button.config(state=tk.DISABLED)
-                elif command.startswith("DUMP"):
-                    # assume what follows is an index from 0-499, invalid values will be ignored
-                    try:
-                        command = command.replace("DUMP", "")
-                        index = int(command)
-                        # if the index is valid then update the data at that index
-                        if index < 0 or index >= data_size:
-                            raise ValueError
-                        data[index] = float(response)
-                        print(
-                            f"Index: {index}\tData: {data[index]}")
+                # elif command.startswith("DUMP"):
+                #     # assume what follows is an index from 0-499, invalid values will be ignored
+                #     try:
+                #         command = command.replace("DUMP", "")
+                #         index = int(command)
+                #         # if the index is valid then update the data at that index
+                #         if index < 0 or index >= data_size:
+                #             raise ValueError
+                #         data[index] = float(response)
+                #         print(
+                #             f"Index: {index}\tData: {data[index]}")
 
-                        print(f"Data[{index}] = {data[index]}")
-                        # if the index is the last index then save the data to a csv file
-                        if index == data_size - 1 or index == value_index:
-                            print("Saving data to csv file...")
-                            # if its the last index save as csv, where there are 3 columns; index, UTC + index * interval, data[index]
-                            with open(f'data_{value_timestamp}.csv', 'w', newline='') as csvfile:
-                                writer = csv.writer(csvfile, delimiter=',')
-                                writer.writerow(['index', 'timestamp', 'data'])
-                                # write the data to the csv file, from 0 to index
-                                for i in range(value_index):
-                                    writer.writerow(
-                                        [i, value_timestamp + i * value_interval, data[i]])
-                            print("Data saved to csv file.")
-                    except Exception as e:
-                        # print line where error occured
-                        print("Error occured on line {}".format(
-                            sys.exc_info()[-1].tb_lineno))
-                        print(e)
+                #         print(f"Data[{index}] = {data[index]}")
+                #         # if the index is the last index then save the data to a csv file
+                #         if index == data_size - 1 or index == value_index:
+                #             print("Saving data to csv file...")
+                #             # if its the last index save as csv, where there are 3 columns; index, UTC + index * interval, data[index]
+                #             with open(f'data_{value_timestamp}.csv', 'w', newline='') as csvfile:
+                #                 writer = csv.writer(csvfile, delimiter=',')
+                #                 writer.writerow(['index', 'timestamp', 'data'])
+                #                 # write the data to the csv file, from 0 to index
+                #                 for i in range(value_index):
+                #                     writer.writerow(
+                #                         [i, value_timestamp + i * value_interval, data[i]])
+                #             print("Data saved to csv file.")
+                #     except Exception as e:
+                #         # print line where error occured
+                #         print("Error occured on line {}".format(
+                #             sys.exc_info()[-1].tb_lineno))
+                #         print(e)
 
-                    # enable the button
-                    state_button.config(state=tk.NORMAL)
+                    # # enable the button
+                    # state_button.config(state=tk.NORMAL)
+                elif command == "DUMP-1\n":
+                    # asume response has the format "[value0] [value1] [value2] ... [value499]\n"
+                    # split the response into a list of strings
+                    response_list = response.strip(
+                        "\n").strip("\r").split(" ")
+
+                    for i in range(data_size):
+                        # convert the string to a float
+                        try:
+                            data[i] = int(response_list[i])
+                        except Exception as e:
+                            data[i] = 0
+                    print("Saving data to csv file...")
+                    # check if csv file already exists, if it does then create a new file with a incremented number
+                    file_number = 0
+                    while os.path.exists(f'data_{value_timestamp}_{file_number}.csv'):
+                        file_number += 1
+                    # if its the last index save as csv, where there are 3 columns; index, UTC + index * interval, data[index]
+                    with open(f'data_{value_timestamp}_{file_number}.csv', 'w', newline='') as csvfile:
+                        writer = csv.writer(csvfile, delimiter=',')
+                        writer.writerow(
+                            ['index', 'timestamp', 'temperature', 'data'])
+                        # write the data to the csv file, from 0 to index
+                        for i in range(value_index):
+                            # get the closest temperature value with the given bit value
+                            # loop through temp_data dictionary (key = temperature, value = bit value)
+                            closeness = 100
+                            for temperature, bit in temp_data.items():
+                                # if the value is equal to the data[i] value then set the temperature to the key value
+                                if abs(bit - data[i]) < closeness:
+                                    closeness = bit - data[i]
+                                    temperature_value = temperature
+
+                            writer.writerow(
+                                [i, value_timestamp + i * value_interval, temperature_value, data[i]])
+                    print(
+                        f"Data saved to csv file: data_{value_timestamp}.csv")
                 elif command.startswith("CLEAR"):
                     # enable the button
                     state_button.config(state=tk.NORMAL)
@@ -323,9 +375,10 @@ def save_data():
     # disable the button
     save_button.config(state=tk.DISABLED)
     # for 0 to 499 add "DUMP{index}?\n" to the queue
-    for i in range(0, data_size):
-        # serial_queue.put(f"DUMP{i}\n")
-        serial_list.append(f"DUMP{i}\n")
+    # for i in range(0, data_size):
+    #     # serial_queue.put(f"DUMP{i}\n")
+    #     serial_list.append(f"DUMP{i}\n")
+    serial_list.append("DUMP-1\n")
 
 
 # Function to start or restart the serial thread when a COM Port is selected

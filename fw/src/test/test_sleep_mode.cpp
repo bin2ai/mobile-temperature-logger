@@ -489,14 +489,29 @@ void loop()
                 Serial.println("ERROR");
                 return;
             }
+
             uint8_t startPos = input.indexOf("DUMP");
             uint8_t endPos = input.indexOf("\n");
             // get length of numbered string
             uint8_t length = endPos - startPos;
             // get index number, i.e. DUMP100, index = 100, or DUMP24, index = 24
-            uint16_t index = input.substring(startPos + 4, length).toInt();
+            int index = input.substring(startPos + 4, length).toInt();
+
+            // if index is equal to -1, then dump all
+            if (index == -1)
+            {
+                // dump all
+                for (uint16_t i = 0; i < SIZE_TELMETRY; i++)
+                {
+                    // assume each telemetry is 2 bytes, concat before printing
+                    uint16_t telemetry = (EEPROM.read(i * 2 + OFFSET_EEPROM_TELEMETRY) << 8) | EEPROM.read(i * 2 + OFFSET_EEPROM_TELEMETRY + 1);
+                    Serial.print(telemetry);
+                    Serial.print(" ");
+                }
+                Serial.println();
+            }
             // check if index number follows DUMP
-            if (index < SIZE_TELMETRY)
+            else if ((uint16_t)index < SIZE_TELMETRY)
             {
                 index = index * 2;
                 // assume each telemetry is 2 bytes, concat before printing
