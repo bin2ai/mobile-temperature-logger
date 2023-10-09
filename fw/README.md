@@ -8,13 +8,15 @@ Current .HEX
 RAM:   [==========]  96.9% (used 2481 bytes from 2560 bytes)  
 Flash: [====      ]  36.3% (used 10410 bytes from 28672 bytes)
 
-### Initial Flash 
+### Initial Flash
 
 ``` bash
-avrdude -c usbtiny -p atmega32u4 -U lfuse:w:0xD7:m -U hfuse:w:0xD8:m -U efuse:w:0xC9:m -U flash:w:Caterina-Feather32u4.hex
+avrdude -c usbtiny -p atmega32u4 -U lfuse:w:0xFF:m -U hfuse:w:0xD8:m -U efuse:w:0xCB:m -U flash:w:Caterina-Feather32u4.hex
 ```
 
-### Diagram
+Microchip ATMega32u4 [datasheet pdf](https://ww1.microchip.com/downloads/en/devicedoc/atmel-7766-8-bit-avr-atmega16u4-32u4_datasheet.pdf)
+
+### Diagramn
 
 ```mermaid
 stateDiagram-v2
@@ -33,6 +35,7 @@ stateDiagram-v2
 ```
 
 ### VScode PIO Shortcuts
+
 - build (ctrl+alt+b)
 - upload (ctrl+alt+u)
 
