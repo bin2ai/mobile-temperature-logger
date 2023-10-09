@@ -1,14 +1,13 @@
 import csv
 import datetime
 from enum import Enum
+import sys
 import time
 import tkinter as tk
 from tkinter import ttk
-from tkinter import scrolledtext
 import serial.tools.list_ports
 import serial
 import threading
-import queue
 
 
 class DeviceState(Enum):
@@ -31,12 +30,16 @@ value_index = 0
 value_timestamp = 0
 value_estimated_time_remaining = 0
 # Create a thread-safe queue for serial commands
-serial_queue = queue.Queue()
+# serial_queue = queue.Queue()
+serial_list: list = []
 
 selected_port = ""  # Variable to hold the selected COM port
 serial_thread = None  # Variable to hold the serial thread
 data = []  # Variable to hold the data received from the serial port
 data_size = 500
+
+for i in range(data_size):
+    data.append(0)
 
 is_cmd_priority = False
 
@@ -49,7 +52,7 @@ def reset_data():
     data = []
     global data_size
     for i in range(data_size):
-        data.append(0)
+        data[i] = 0
 
 # Function to list available COM ports
 
@@ -68,34 +71,52 @@ def on_select(event):
 
 
 def add_status_cmd_to_queue():
-    serial_queue.put('STATUS?STATE\n')
-    serial_queue.put('STATUS?VBUS\n')
-    serial_queue.put('STATUS?VBAT\n')
-    serial_queue.put('STATUS?TEMP\n')
-    serial_queue.put('STATUS?CHARGING_L\n')
-    serial_queue.put('STATUS?STANDBY_L\n')
-    serial_queue.put('STATUS?INTERVAL\n')
-    serial_queue.put('STATUS?INDEX\n')
-    serial_queue.put('STATUS?UTC\n')
+    serial_list.append('STATUS?STATE\n')
+    serial_list.append('STATUS?VBUS\n')
+    serial_list.append('STATUS?VBAT\n')
+    serial_list.append('STATUS?TEMP\n')
+    serial_list.append('STATUS?CHARGING_L\n')
+    serial_list.append('STATUS?STANDBY_L\n')
+    serial_list.append('STATUS?INTERVAL\n')
+    serial_list.append('STATUS?INDEX\n')
+    serial_list.append('STATUS?UTC\n')
 
 
 # Function to handle serial communication
 def serial_worker():
     global selected_port, value_vbus, value_vbat, value_charging_l, value_standby_l, value_state, value_interval, value_index, value_timestamp, value_estimated_time_remaining, last_status_update
+    global serial_list
+    global data, data_size
     while True:
         try:
             try:
-                command = serial_queue.get(timeout=1)
-            except queue.Empty:
+                command = ""
+                # check list if in the list a command is available that is not a status command, then remove all status commands from the list and pop the first command
+                is_status_only = True
+                for cmd in serial_list:
+                    if not cmd.startswith("STATUS?"):
+                        is_status_only = False
+                        break
+                if not is_status_only:
+                    for cmd in serial_list:
+                        if cmd.startswith("STATUS?"):
+                            serial_list.remove(cmd)
+                # if the list is empty, then add a status command to the list
+                if len(serial_list) == 0:
+                    add_status_cmd_to_queue()
+                command = serial_list.pop(0)
+            except Exception as e:
                 if time.time() - last_status_update > status_update_seconds:
                     add_status_cmd_to_queue()
                     last_status_update = time.time()
+            if command == "":
+                continue
 
             # if selected_port is "" then skip the rest of the loop
             if selected_port == "":
                 continue
             # Open and configure the serial port
-            with serial.Serial(selected_port, 9600, timeout=3) as ser:
+            with serial.Serial(selected_port, 115200, timeout=0.25) as ser:
                 # Send the command over the serial port
                 ser.write(command.encode())
 
@@ -153,6 +174,7 @@ def serial_worker():
                         label_index.config(
                             text=f"Index: {str(value_index)}/{str(data_size)}")
                     elif command == "STATUS?UTC\n":
+                        print(response)
                         value_timestamp = int(response)
                         date_str = datetime.datetime.utcfromtimestamp(
                             value_timestamp).strftime('%Y-%m-%d %H:%M:%S')
@@ -187,16 +209,14 @@ def serial_worker():
                 elif command.startswith("DUMP"):
                     # assume what follows is an index from 0-499, invalid values will be ignored
                     try:
-                        command = command.split(
-                            "DUMP")[1].strip().split("\n")[0]
+                        command = command.replace("DUMP", "")
                         index = int(command)
-                        print(
-                            f"Index: {index}\tData: {data[index]}")
-
                         # if the index is valid then update the data at that index
                         if index < 0 or index >= data_size:
                             raise ValueError
                         data[index] = float(response)
+                        print(
+                            f"Index: {index}\tData: {data[index]}")
 
                         print(f"Data[{index}] = {data[index]}")
                         # if the index is the last index then save the data to a csv file
@@ -207,12 +227,16 @@ def serial_worker():
                                 writer = csv.writer(csvfile, delimiter=',')
                                 writer.writerow(['index', 'timestamp', 'data'])
                                 # write the data to the csv file, from 0 to index
-                                for i in range(value_index + 1):
+                                for i in range(value_index):
                                     writer.writerow(
                                         [i, value_timestamp + i * value_interval, data[i]])
                             print("Data saved to csv file.")
-                    except:
-                        pass
+                    except Exception as e:
+                        # print line where error occured
+                        print("Error occured on line {}".format(
+                            sys.exc_info()[-1].tb_lineno))
+                        print(e)
+
                     # enable the button
                     state_button.config(state=tk.NORMAL)
                 elif command.startswith("CLEAR"):
@@ -228,6 +252,9 @@ def serial_worker():
                     state_button.config(state=tk.NORMAL)
 
         except Exception as e:
+            # print line where error occured
+            print("Error occured on line {}".format(
+                sys.exc_info()[-1].tb_lineno))
             print(e)
 # # Function to update the console in a thread-safe manner
 # def update_console(text):
@@ -244,7 +271,8 @@ def send_serial_command():
     # if it doesnt end with a newline, add one
     if not command.endswith("\n"):
         command += "\n"
-    serial_queue.put(command)
+    # serial_queue.put(command)
+    serial_list.append(command)
 
 
 def update_state():
@@ -256,15 +284,20 @@ def update_state():
     # if idle then send start command
     if value_state == DeviceState.IDLE.value:
         utc_time = int(time.time())
-        serial_queue.put(f"UTC={utc_time}\n")
-        serial_queue.put(f"INTERVAL={value_interval}\n")
-        serial_queue.put("START\n")
+        # serial_queue.put(f"UTC={utc_time}\n")
+        # serial_queue.put(f"INTERVAL={value_interval}\n")
+        # serial_queue.put("START\n")
+        serial_list.append(f"UTC={utc_time}\n")
+        serial_list.append(f"INTERVAL={value_interval}\n")
+        serial_list.append("START\n")
     # if collecting then send stop command
     elif value_state == DeviceState.COLLECTING.value:
-        serial_queue.put("STOP\n")
+        # serial_queue.put("STOP\n")
+        serial_list.append("STOP\n")
     # if partial or full then send clear command
     elif value_state == DeviceState.PARTIAL_FULL.value or value_state == DeviceState.FULL.value:
-        serial_queue.put("CLEAR\n")
+        # serial_queue.put("CLEAR\n")
+        serial_list.append("CLEAR\n")
     # if error then do nothing
     else:
         pass
@@ -281,7 +314,8 @@ def update_interval(event):
         label_sampling_interval.config(
             text="Interval: " + str(value_interval) + "s")
         # send the interval command
-        serial_queue.put(f"INTERVAL={value_interval}\n")
+        # serial_queue.put(f"INTERVAL={value_interval}\n")
+        serial_list.append(f"INTERVAL={value_interval}\n")
     slider_sampling_interval.config(state=tk.DISABLED)
 
 
@@ -289,8 +323,9 @@ def save_data():
     # disable the button
     save_button.config(state=tk.DISABLED)
     # for 0 to 499 add "DUMP{index}?\n" to the queue
-    for i in range(0, value_index+1):
-        serial_queue.put(f"DUMP{i}\n")  # 0-
+    for i in range(0, data_size):
+        # serial_queue.put(f"DUMP{i}\n")
+        serial_list.append(f"DUMP{i}\n")
 
 
 # Function to start or restart the serial thread when a COM Port is selected

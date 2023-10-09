@@ -234,8 +234,8 @@ uint16_t get_temp()
 void setup()
 {
     // Initialize serial communication
-    Serial.begin(9600);
-    Serial.setTimeout(1000);
+    Serial.begin(115200);
+    Serial.setTimeout(100);
 
     // SET AS OUTPUT HIGH Z
     pinMode(PINO_ENABLE, OUTPUT);
@@ -268,8 +268,6 @@ void loop()
     // if is not connected go to sleep for (1 or 8) seconds
     if (!is_usb_connected && state == STATE_COLLECTING)
     {
-        // #blink 5 times
-        blink_led(5);
         if (interval_collection_seconds < 8)
             LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
         else
@@ -279,7 +277,6 @@ void loop()
     // check serial for string "something\r\n"
     if (Serial.available() > 0)
     {
-        blink_led(2);
         String input = Serial.readStringUntil('\n');
         if (input.startsWith("STATUS?"))
         {
@@ -317,6 +314,7 @@ void loop()
                 return;
             }
             // clear utc variable and eeprom
+            Serial.println("OK");
             utc = 0;
             EEPROM.write(OFFSET_EEPROM_UTC + 0, 0);
             EEPROM.write(OFFSET_EEPROM_UTC + 1, 0);
@@ -326,17 +324,15 @@ void loop()
             index_temp_telm = 0;
             EEPROM.write(OFFSET_EEPROM_INDEX + 0, 0);
             EEPROM.write(OFFSET_EEPROM_INDEX + 1, 0);
-            // clear telemetry and eeprom
-            for (uint16_t i = 0; i < SIZE_TELMETRY; i += 2)
+            // clear telemetry and eeprom, this goes
+            for (uint16_t i = 0; i < SIZE_TELMETRY; i++)
             {
-                EEPROM.write(OFFSET_EEPROM_TELEMETRY + i, 0);
-                EEPROM.write(OFFSET_EEPROM_TELEMETRY + i + 1, 0);
+                EEPROM.write(OFFSET_EEPROM_TELEMETRY + i * 2 + 0, 0);
+                EEPROM.write(OFFSET_EEPROM_TELEMETRY + i * 2 + 1, 0);
             }
             // interval
             interval_collection_seconds = 0;
             EEPROM.write(OFFSET_EEPROM_INTERVAL, 0);
-
-            Serial.println("OK");
             // reset index
             index_temp_telm = 0;
             // reset state
@@ -517,12 +513,13 @@ void loop()
         else
             Serial.println("ERROR");
         Serial.flush();
+        blink_led(1);
     }
     // if state collecting, collect temperature telemetry, i
     if (state == STATE_COLLECTING)
     {
         // if telemetry is full, go into full state
-        if (index_temp_telm > SIZE_TELMETRY - 1)
+        if (index_temp_telm > SIZE_TELMETRY - 2)
         {
             state = STATE_TELM_FULL;
             return;
@@ -532,12 +529,12 @@ void loop()
         if (millis() - time_collection_start >= interval_collection_seconds * 1000)
         {
             uint16_t temp = get_temp();
-            // write to EEPROM
-            EEPROM.write(index_temp_telm + OFFSET_EEPROM_TELEMETRY, temp >> 8);
-            EEPROM.write(index_temp_telm + OFFSET_EEPROM_TELEMETRY + 1, temp & 0xFF);
-
+            // write to EEPROM, where index is multiplied by 2
+            // so that each telemetry is 2 bytes, the first byte is the MSB, the second byte is the LSB
+            EEPROM.write(index_temp_telm * 2 + OFFSET_EEPROM_TELEMETRY, (temp >> 8) & 0xFF);
+            EEPROM.write(index_temp_telm * 2 + OFFSET_EEPROM_TELEMETRY + 1, temp & 0xFF);
             // increment index
-            index_temp_telm += 2;
+            index_temp_telm += 1;
             time_collection_start = millis();
             blink_led(1);
         }
