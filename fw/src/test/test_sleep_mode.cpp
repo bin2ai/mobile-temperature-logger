@@ -56,6 +56,11 @@ uint8_t OFFSET_EEPROM_TELEMETRY = 10; // size 1000 bytes
 uint8_t id = 0;  // user defined id, can be set multiple times
 uint8_t uid = 0; // hardware unique id, should only be set once
 
+float lowest_value_of_vbus = 0;
+
+uint32_t time_last_sleep_idle = 0;
+uint8_t time_sleep_in_idle_for = 60; // seconds
+
 void death_loop()
 {
     while (1)
@@ -82,7 +87,7 @@ float get_vbus()
     uint16_t sum_of_samples = 0;
     for (uint8_t i = 0; i < samples_to_average; i++)
     {
-        sum_of_samples += analogRead(PINA_TEMP);
+        sum_of_samples += analogRead(PINA_VBUS);
         delay(5);
     }
 
@@ -100,46 +105,6 @@ float get_vbat()
     return (float)sum_of_samples / samples_to_average * 3.3 * 8.5 / 1023.0;
 }
 
-float get_temperature(uint16_t bit_value = 0)
-{
-    /*
-    P/N: SDNT2012X104F4250FTF
-    R25 = 100k
-    B25 = 4250 (@25C-50C)
-    K_A = 2000 kelvin to fahrenheit
-    K_B = 77 kelvin to fahrenheit
-    K_C = 5963 kelvin to fahrenheit
-    K_D = 45967 kelvin to fahrenheit
-    Rt =  R25 * exp((-K_A*B25*(Temp_F-K_B))/(K_C*100*Temp_F+K_D))
-    Temp_F = (K_A*B25*K_B+K_C*100*log(Rt/R25))/(K_C*100-K_A*B25)
-
-    eq: Rt = Vt/(Vt/R1-Vs/R1-Vt/R2)
-     * Rt = thermistor resistance
-     * Vt = thermistor voltage
-     * Vs = supply voltage
-     * R1 = 10k
-     * R2 = 100k
-     *
-     */
-
-    float voltage = 0.0;
-    if (bit_value == 0)
-        voltage = (float)analogRead(PINA_TEMP) * 3.3 / 1023.0;
-    else
-        voltage = (float)bit_value * 3.3 / 1023.0;
-
-    float resistance = voltage / (voltage / 10000 - 3.3 / 10000 - voltage / 100000);
-    double numerator = (2000.0L * 4250.0L * 77.0L - log(resistance / 100000.0L) * 5963.0L * 45967.0L);
-    double denominator = (log(resistance / 100000.0L) * 5963.0L * 100.0L + 2000.0L * 4250.0L);
-    // Serial Print resistance, numerator, denominator
-    Serial.println(voltage);
-    Serial.println(resistance);
-    Serial.println(numerator);
-    Serial.println(denominator);
-
-    return (float)(numerator / denominator);
-}
-
 void blink_led(uint8_t times = 2)
 {
     for (uint8_t i = 0; i < times; i++)
@@ -153,7 +118,6 @@ void blink_led(uint8_t times = 2)
 
 void check_usb()
 {
-
     if (get_vbus() > vbus_theshold)
     {
         if (!is_usb_connected)
@@ -179,6 +143,7 @@ void check_usb()
 // check button press, func
 void check_button_press()
 {
+
     if (digitalRead(PINI_BUTTON) == HIGH)
     {
         if (button_press_init == false)
@@ -195,16 +160,19 @@ void check_button_press()
         {
 
             uint32_t button_press_time = millis() - time_button_press;
-            pretty_print("Button pressed for %d ms, shutting down\n", button_press_time);
+
             if (button_press_time > TIME_LIMIT_BUTTON_LOWER && button_press_time < TIME_LIMIT_BUTTON_UPPER)
             {
+                pretty_print("Button pressed for %d ms, shutting down if usb not connected\n", button_press_time);
                 // ignore if USB is connected
                 if (!is_usb_connected)
                 {
                     blink_led(3);
                     delay(1000);
                     USBDevice.detach();
+                    detachInterrupt(digitalPinToInterrupt(PINI_BUTTON));
                     digitalWrite(PINO_ENABLE, LOW);
+
                     death_loop(); // just in case PINO_ENABLE fails
                 }
                 else
@@ -244,6 +212,15 @@ void setup()
     pinMode(PINI_STANDBY_L, INPUT_PULLUP);
     pinMode(PINO_LED_L, OUTPUT);
     digitalWrite(PINO_LED_L, HIGH);
+    // setup interrupt on VBUS input high
+    pinMode(PINA_VBUS, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PINA_VBUS), check_usb, CHANGE);
+    // button as an interrupt
+    pinMode(PINI_BUTTON, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PINI_BUTTON), check_button_press, CHANGE);
+    // usb serial data interrupt
+    SerialUSB.begin(115200);
+    SerialUSB.setTimeout(100);
 
     // read first 2 bytes of eeprom for index
     index_temp_telm = EEPROM.read(OFFSET_EEPROM_INDEX + 0) << 8 | EEPROM.read(OFFSET_EEPROM_INDEX + 1);
@@ -264,14 +241,20 @@ void loop()
 {
 
     check_usb();
-    check_button_press();
     // if is not connected go to sleep for (1 or 8) seconds
     if (!is_usb_connected && state == STATE_COLLECTING)
     {
-        if (interval_collection_seconds < 8)
-            LowPower.powerDown(SLEEP_1S, ADC_OFF, BOD_OFF);
+        if (state == STATE_COLLECTING)
+        {
+            // add 100ms to account for time to wake up
+            uint32_t sleep_time = millis() - time_collection_start + interval_collection_seconds * 1000 - 100;
+            if (sleep_time > 0)
+                LowPower.longPowerDown(sleep_time);
+        }
         else
-            LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+        {
+            LowPower.longPowerDown(time_sleep_in_idle_for * 1000);
+        }
     }
 
     // check serial for string "something\r\n"
@@ -524,7 +507,47 @@ void loop()
                 Serial.println("ERROR");
             }
         }
-        // flush
+        // reset
+        // send bulk status (HEATH)
+        else if (input == "HEALTH")
+        {
+            Serial.print("Vbus: ");
+            Serial.print(get_vbus());
+            Serial.print("V, ");
+            Serial.print("Vbat: ");
+            Serial.print(get_vbat());
+            Serial.print("V, ");
+            Serial.print("Temp: ");
+            Serial.print(get_temp());
+            Serial.print(", ");
+            Serial.print("UTC: ");
+            Serial.print(utc);
+            Serial.print(", ");
+            Serial.print("Interval: ");
+            Serial.print(interval_collection_seconds);
+            Serial.print("s, ");
+            Serial.print("Index: ");
+            Serial.print(index_temp_telm);
+            Serial.print(", ");
+            Serial.print("State: ");
+            Serial.print(state);
+            Serial.print(", ");
+            Serial.print("Standby: ");
+            Serial.print(digitalRead(PINI_STANDBY_L));
+            Serial.print(", ");
+            Serial.print("Charge: ");
+            Serial.print(digitalRead(PINI_CHARGING_L));
+            Serial.println();
+        }
+        else if (input == "RESET")
+        {
+            // reset
+            Serial.println("OK");
+            blink_led(3);
+            // PINO_ENABLE Low
+            digitalWrite(PINO_ENABLE, LOW);
+            delay(3000);
+        }
         else
             Serial.println("ERROR");
         Serial.flush();

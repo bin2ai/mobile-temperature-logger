@@ -86,18 +86,17 @@ def on_select(event):
 
 
 def add_status_cmd_to_queue():
-    serial_list.append('STATUS?STATE\n')
-    serial_list.append('STATUS?VBUS\n')
-    serial_list.append('STATUS?VBAT\n')
-    serial_list.append('STATUS?TEMP\n')
-    serial_list.append('STATUS?CHARGING_L\n')
-    serial_list.append('STATUS?STANDBY_L\n')
-    serial_list.append('STATUS?INTERVAL\n')
-    serial_list.append('STATUS?INDEX\n')
-    serial_list.append('STATUS?UTC\n')
+    # if time now - last status update > 5 seconds, then add a status command to the queue
+    global serial_list
+    global last_status_update
+    if time.time() - last_status_update > status_update_seconds:
+        serial_list.append("HEALTH\n")
+        last_status_update = time.time()
 
 
 # Function to handle serial communication
+
+
 def serial_worker():
     global selected_port, value_vbus, value_vbat, value_charging_l, value_standby_l, value_state, value_interval, value_index, value_timestamp, value_estimated_time_remaining, last_status_update
     global serial_list
@@ -109,12 +108,12 @@ def serial_worker():
                 # check list if in the list a command is available that is not a status command, then remove all status commands from the list and pop the first command
                 is_status_only = True
                 for cmd in serial_list:
-                    if not cmd.startswith("STATUS?"):
+                    if not cmd == "HEALTH\n":
                         is_status_only = False
                         break
                 if not is_status_only:
                     for cmd in serial_list:
-                        if cmd.startswith("STATUS?"):
+                        if cmd == "HEALTH\n":
                             serial_list.remove(cmd)
                 # if the list is empty, then add a status command to the list
                 if len(serial_list) == 0:
@@ -152,7 +151,109 @@ def serial_worker():
                 # str
 
                 # Parse and update labels based on the received response
-                if command.startswith("STATUS?"):
+                if command == "HEALTH\n":
+                    # print("Vbat: ")
+                    # print(get_vbat());
+                    # print("V, ");
+                    # print("Temp: ");
+                    # print(get_temp());
+                    # print(", ");
+                    # print("UTC: ");
+                    # print(utc);
+                    # print(", ");
+                    # print("Interval: ");
+                    # print(interval_collection_seconds);
+                    # print("s, ");
+                    # print("Index: ");
+                    # print(index_temp_telm);
+                    # print(", ");
+                    # print("State: ");
+                    # print(state);
+                    # print(", ");
+                    # print("Standby: ");
+                    # print(digitalRead(PINI_STANDBY_L));
+                    # print(", ");
+                    # print("Charge: ");
+                    # print(digitalRead(PINI_CHARGING_L));
+                    # println();
+
+                    # split response by ','
+                    response_split = response.split(',')
+                    for i in range(len(response_split)):
+                        response_split[i] = response_split[i].split(':')
+                        item = response_split[i][0].strip()
+                        value = response_split[i][1].strip()
+
+                        if item == "Vbat":
+                            # strip item and value by :
+                            value_vbat = value.strip("V")
+                            value_vbat = float(value_vbat)
+                            label_vbat.config(
+                                text=f"Vbat (4.2V full charge): {str(value_vbat)}V")
+                            # set max to 4.2V
+                            progress_vbat.config(maximum=4.2-3.0)
+                            progress_vbat.config(value=value_vbat-3.0)
+                            # set min to 3.0V
+                        elif item == "Vbus":
+                            value_vbus = float(value.strip("V"))
+                            label_vbus.config(
+                                text=f"Vbus (5V): {str(value_vbus)}V")
+                        elif item == "UTC":
+                            value_timestamp = int(value)
+                            date_str = datetime.datetime.utcfromtimestamp(
+                                value_timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                            label_timestamp.config(
+                                text="Timestamp: " + date_str)
+                        elif item == "Interval":
+                            value_interval = int(value.strip("s"))
+                            label_sampling_interval.config(
+                                text=f"Interval: {str(value_interval)}s")
+                        elif item == "Index":
+                            value_index = int(value)
+                            label_index.config(
+                                text=f"Index: {str(value_index)}")
+                            label_index.config(
+                                text=f"Index: {str(value_index)}/{str(data_size)}")
+                        elif item == "State":
+                            # set the state text to the device_state enum member that matches the value
+                            state: str = DeviceState(int(value)).name
+                            value_state = int(value)
+                            label_state.config(text="State: " + state)
+                            # update
+                            # use device_state enum
+                            # if idle then set state_button text to start
+                            if value_state == DeviceState.IDLE.value:
+                                state_button.config(text="Start")
+                                state_button.config(state=tk.NORMAL)
+                                # save button enable
+                                save_button.config(state=tk.NORMAL)
+                            elif value_state == DeviceState.COLLECTING.value:
+                                state_button.config(text="Stop")
+                                state_button.config(state=tk.NORMAL)
+                                # save button disable
+                                save_button.config(state=tk.DISABLED)
+                            elif value_state == DeviceState.PARTIAL_FULL.value or value_state == DeviceState.FULL.value:
+                                state_button.config(text="Clear")
+                                state_button.config(state=tk.NORMAL)
+                                # save button enable
+                                save_button.config(state=tk.NORMAL)
+                            else:
+                                state_button.config(text="Error")
+                                state_button.config(state=tk.DISABLED)
+                                # save button disable
+                                save_button.config(state=tk.DISABLED)
+                        elif item == "Standby":
+                            value_standby_l = not bool(value)
+                            label_standby_l.config(
+                                text=f"Standby: {value_standby_l}")
+                        elif item == "Charge":
+                            value_charging_l = not bool(value)
+                            label_charging_l.config(
+                                text="Charging: " + str(value_charging_l))
+                        else:
+                            pass
+
+                elif command.startswith("STATUS?"):
                     if command == "STATUS?VBUS\n":
                         value_vbus = float(response)
                         label_vbus.config(
@@ -172,7 +273,7 @@ def serial_worker():
                     elif command == "STATUS?STANDBY_L\n":
                         value_standby_l = not bool(response)
                         label_standby_l.config(
-                            text="Standby: " + str(value_standby_l))
+                            text="Standby: " + bool(value_standby_l))
                     elif command == "STATUS?INTERVAL\n":
                         value_interval = int(response)
                         label_sampling_interval.config(
