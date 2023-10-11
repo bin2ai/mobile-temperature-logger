@@ -152,31 +152,6 @@ def serial_worker():
 
                 # Parse and update labels based on the received response
                 if command == "HEALTH\n":
-                    # print("Vbat: ")
-                    # print(get_vbat());
-                    # print("V, ");
-                    # print("Temp: ");
-                    # print(get_temp());
-                    # print(", ");
-                    # print("UTC: ");
-                    # print(utc);
-                    # print(", ");
-                    # print("Interval: ");
-                    # print(interval_collection_seconds);
-                    # print("s, ");
-                    # print("Index: ");
-                    # print(index_temp_telm);
-                    # print(", ");
-                    # print("State: ");
-                    # print(state);
-                    # print(", ");
-                    # print("Standby: ");
-                    # print(digitalRead(PINI_STANDBY_L));
-                    # print(", ");
-                    # print("Charge: ");
-                    # print(digitalRead(PINI_CHARGING_L));
-                    # println();
-
                     # split response by ','
                     response_split = response.split(',')
                     for i in range(len(response_split)):
@@ -243,11 +218,11 @@ def serial_worker():
                                 # save button disable
                                 save_button.config(state=tk.DISABLED)
                         elif item == "Standby":
-                            value_standby_l = not bool(value)
+                            value_standby_l = False if value == "1" else True
                             label_standby_l.config(
                                 text=f"Standby: {value_standby_l}")
                         elif item == "Charge":
-                            value_charging_l = not bool(value)
+                            value_charging_l = False if value == "1" else True
                             label_charging_l.config(
                                 text="Charging: " + str(value_charging_l))
                         else:
