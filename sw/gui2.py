@@ -180,9 +180,14 @@ def serial_worker():
                             label_timestamp.config(
                                 text="Timestamp: " + date_str)
                         elif item == "Interval":
-                            value_interval = int(value.strip("s"))
                             label_sampling_interval.config(
-                                text=f"Interval: {str(value_interval)}s")
+                                text="Interval: " + value)
+                            est_seconds = int(value.strip(
+                                "s"))*(data_size-value_index)
+                            # convert to HH:MM:SS
+                            label_estimated_completion_time.config(
+                                text="Estimated Time Remaining: " + str(datetime.timedelta(seconds=est_seconds)))
+                            slider_sampling_interval.config(state=tk.NORMAL)
                         elif item == "Index":
                             value_index = int(value)
                             label_index.config(
@@ -228,108 +233,6 @@ def serial_worker():
                         else:
                             pass
 
-                elif command.startswith("STATUS?"):
-                    if command == "STATUS?VBUS\n":
-                        value_vbus = float(response)
-                        label_vbus.config(
-                            text=f"Vbus (5.0V nominal): {str(value_vbus)}V")
-                    elif command == "STATUS?VBAT\n":
-                        value_vbat = float(response)
-                        label_vbat.config(
-                            text=f"Vbat (4.2V full charge): {str(value_vbat)}V")
-                        # set max to 4.2V
-                        progress_vbat.config(maximum=4.2)
-                        # set min to 3.0V
-                        progress_vbat.config(value=value_vbat)
-                    elif command == "STATUS?CHARGING_L\n":
-                        value_charging_l = not bool(response)
-                        label_charging_l.config(
-                            text="Charging: " + str(value_charging_l))
-                    elif command == "STATUS?STANDBY_L\n":
-                        value_standby_l = not bool(response)
-                        label_standby_l.config(
-                            text="Standby: " + bool(value_standby_l))
-                    elif command == "STATUS?INTERVAL\n":
-                        value_interval = int(response)
-                        label_sampling_interval.config(
-                            text="Interval: " + str(value_interval) + "s")
-                        est_seconds = value_interval*(data_size-value_index)
-                        # convert to HH:MM:SS
-                        label_estimated_completion_time.config(
-                            text="Estimated Time Remaining: " + str(datetime.timedelta(seconds=est_seconds)))
-                        slider_sampling_interval.config(state=tk.NORMAL)
-                        # update slider based on value
-                        slider_sampling_interval.set(value_interval)
-                    elif command == "STATUS?INDEX\n":
-                        value_index = int(response)
-                        label_index.config(
-                            text=f"Index: {str(value_index)}/{str(data_size)}")
-                    elif command == "STATUS?UTC\n":
-                        print(response)
-                        value_timestamp = int(response)
-                        date_str = datetime.datetime.utcfromtimestamp(
-                            value_timestamp).strftime('%Y-%m-%d %H:%M:%S')
-                        label_timestamp.config(text="Timestamp: " + date_str)
-                    elif command == "STATUS?STATE\n":
-                        # set the state text to the device_state enum member that matches the value
-                        state: str = DeviceState(int(response)).name
-                        value_state = int(response)
-                        label_state.config(text="State: " + state)
-                        # use device_state enum
-                        # if idle then set state_button text to start
-                        if value_state == DeviceState.IDLE.value:
-                            state_button.config(text="Start")
-                            state_button.config(state=tk.NORMAL)
-                            # save button enable
-                            save_button.config(state=tk.NORMAL)
-                        elif value_state == DeviceState.COLLECTING.value:
-                            state_button.config(text="Stop")
-                            state_button.config(state=tk.NORMAL)
-                            # save button disable
-                            save_button.config(state=tk.DISABLED)
-                        elif value_state == DeviceState.PARTIAL_FULL.value or value_state == DeviceState.FULL.value:
-                            state_button.config(text="Clear")
-                            state_button.config(state=tk.NORMAL)
-                            # save button enable
-                            save_button.config(state=tk.NORMAL)
-                        else:
-                            state_button.config(text="Error")
-                            state_button.config(state=tk.DISABLED)
-                            # save button disable
-                            save_button.config(state=tk.DISABLED)
-                # elif command.startswith("DUMP"):
-                #     # assume what follows is an index from 0-499, invalid values will be ignored
-                #     try:
-                #         command = command.replace("DUMP", "")
-                #         index = int(command)
-                #         # if the index is valid then update the data at that index
-                #         if index < 0 or index >= data_size:
-                #             raise ValueError
-                #         data[index] = float(response)
-                #         print(
-                #             f"Index: {index}\tData: {data[index]}")
-
-                #         print(f"Data[{index}] = {data[index]}")
-                #         # if the index is the last index then save the data to a csv file
-                #         if index == data_size - 1 or index == value_index:
-                #             print("Saving data to csv file...")
-                #             # if its the last index save as csv, where there are 3 columns; index, UTC + index * interval, data[index]
-                #             with open(f'data_{value_timestamp}.csv', 'w', newline='') as csvfile:
-                #                 writer = csv.writer(csvfile, delimiter=',')
-                #                 writer.writerow(['index', 'timestamp', 'data'])
-                #                 # write the data to the csv file, from 0 to index
-                #                 for i in range(value_index):
-                #                     writer.writerow(
-                #                         [i, value_timestamp + i * value_interval, data[i]])
-                #             print("Data saved to csv file.")
-                #     except Exception as e:
-                #         # print line where error occured
-                #         print("Error occured on line {}".format(
-                #             sys.exc_info()[-1].tb_lineno))
-                #         print(e)
-
-                    # # enable the button
-                    # state_button.config(state=tk.NORMAL)
                 elif command == "DUMP-1\n":
                     # asume response has the format "[value0] [value1] [value2] ... [value499]\n"
                     # split the response into a list of strings
@@ -416,7 +319,7 @@ def update_state():
         # serial_queue.put(f"INTERVAL={value_interval}\n")
         # serial_queue.put("START\n")
         serial_list.append(f"UTC={utc_time}\n")
-        serial_list.append(f"INTERVAL={value_interval}\n")
+        # serial_list.append(f"INTERVAL={value_interval}\n")
         serial_list.append("START\n")
     # if collecting then send stop command
     elif value_state == DeviceState.COLLECTING.value:
@@ -439,12 +342,10 @@ def update_interval(event):
     new_value = slider_sampling_interval.get()
     if new_value != value_interval:
         value_interval = new_value
-        label_sampling_interval.config(
-            text="Interval: " + str(value_interval) + "s")
         # send the interval command
         # serial_queue.put(f"INTERVAL={value_interval}\n")
         serial_list.append(f"INTERVAL={value_interval}\n")
-    slider_sampling_interval.config(state=tk.DISABLED)
+    # slider_sampling_interval.config(state=tk.DISABLED)
 
 
 def save_data():
@@ -531,7 +432,6 @@ slider_sampling_interval.pack(pady=10)
 # Bind the ButtonRelease-1 event to the update_interval function
 slider_sampling_interval.bind("<ButtonRelease-1>", update_interval)
 # disable the slider
-slider_sampling_interval.config(state=tk.DISABLED)
 
 # label for estimated completion time (based on data_size x sampling interval seconds)
 label_estimated_completion_time = tk.Label(

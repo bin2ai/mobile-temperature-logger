@@ -45,6 +45,9 @@ uint8_t samples_to_average = 64; // 1-64, CANNOT BE less than 1 or greater than 
 bool is_interval_set = false;
 uint32_t utc = 0;
 
+bool standby_l = true;
+bool charging_l = true;
+
 // EEPROM offests
 uint8_t OFFSET_EEPROM_INDEX = 0;      // size 2 bytes
 uint8_t OFFSET_EEPROM_UTC = 2;        // size 4 bytes
@@ -82,8 +85,11 @@ void pretty_print(const char *fmt, ...)
     Serial.flush();
 }
 
-float get_vbus()
+float get_vbus(uint8_t samples_to_average = 64)
 {
+    // if samples to average is 0 or greater than 64, set to 64
+    if (samples_to_average > 64 || samples_to_average == 0)
+        samples_to_average = 64;
     uint16_t sum_of_samples = 0;
     for (uint8_t i = 0; i < samples_to_average; i++)
     {
@@ -94,8 +100,11 @@ float get_vbus()
     return (float)sum_of_samples / samples_to_average * 3.3 * 2 / 1023.0;
 }
 
-float get_vbat()
+float get_vbat(uint8_t samples_to_average = 64)
 {
+    // if samples to average is 0 or greater than 64, set to 64
+    if (samples_to_average > 64 || samples_to_average == 0)
+        samples_to_average = 64;
     uint16_t sum_of_samples = 0;
     for (uint8_t i = 0; i < samples_to_average; i++)
     {
@@ -118,6 +127,10 @@ void blink_led(uint8_t times = 2)
 
 void check_usb()
 {
+
+    standby_l = digitalRead(PINI_STANDBY_L);
+    charging_l = digitalRead(PINI_CHARGING_L);
+
     if (get_vbus() > vbus_theshold)
     {
         if (!is_usb_connected)
@@ -187,8 +200,12 @@ void check_button_press()
     }
 }
 
-uint16_t get_temp()
+uint16_t get_temp(uint8_t samples_to_average = 64)
 {
+    // if samples to average is 0 or greater than 64, set to 64
+    if (samples_to_average > 64 || samples_to_average == 0)
+        samples_to_average = 64;
+
     uint16_t sum_of_samples = 0;
     for (uint8_t i = 0; i < samples_to_average; i++)
     {
@@ -218,6 +235,9 @@ void setup()
     // button as an interrupt
     pinMode(PINI_BUTTON, INPUT);
     attachInterrupt(digitalPinToInterrupt(PINI_BUTTON), check_button_press, CHANGE);
+    // set interrupt on standby and charging
+    attachInterrupt(digitalPinToInterrupt(PINI_CHARGING_L), check_usb, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(PINI_STANDBY_L), check_usb, CHANGE);
     // usb serial data interrupt
     SerialUSB.begin(115200);
     SerialUSB.setTimeout(100);
@@ -242,14 +262,12 @@ void loop()
 
     check_usb();
     // if is not connected go to sleep for (1 or 8) seconds
-    if (!is_usb_connected && state == STATE_COLLECTING)
+    if (!is_usb_connected)
     {
         if (state == STATE_COLLECTING)
         {
-            // add 100ms to account for time to wake up
-            uint32_t sleep_time = millis() - time_collection_start + interval_collection_seconds * 1000 - 100;
-            if (sleep_time > 0)
-                LowPower.longPowerDown(sleep_time);
+            if (millis() - time_collection_start > (uint32_t)(interval_collection_seconds * 1000 + 10))
+                LowPower.longPowerDown((uint32_t)(millis() - time_collection_start - interval_collection_seconds * 1000));
         }
         else
         {
@@ -261,34 +279,7 @@ void loop()
     if (Serial.available() > 0)
     {
         String input = Serial.readStringUntil('\n');
-        if (input.startsWith("STATUS?"))
-        {
-            // STATUS?STATE
-            String suffix = input.substring(7);
-            if (suffix == "STATE")
-                Serial.println(state);
-            else if (suffix == "VBUS")
-                Serial.println(get_vbus());
-            else if (suffix == "VBAT")
-                Serial.println(get_vbat());
-            else if (suffix == "TEMP")
-                Serial.println(get_temp());
-            else if (suffix == "CHARGING_L")
-                Serial.println(digitalRead(PINI_CHARGING_L));
-            else if (suffix == "STANDBY_L")
-                Serial.println(digitalRead(PINI_STANDBY_L));
-            else if (suffix == "ENABLE")
-                Serial.println(digitalRead(PINO_ENABLE));
-            else if (suffix == "INDEX")
-                Serial.println(index_temp_telm);
-            else if (suffix == "INTERVAL")
-                Serial.println(interval_collection_seconds);
-            else if (suffix == "UTC")
-                Serial.println(utc);
-            else
-                Serial.println("ERROR");
-        }
-        else if (input == "CLEAR")
+        if (input == "CLEAR")
         {
             // is collecting, send error
             if (state == STATE_COLLECTING or state == STATE_IDLE)
@@ -511,33 +502,25 @@ void loop()
         // send bulk status (HEATH)
         else if (input == "HEALTH")
         {
-            Serial.print("Vbus: ");
-            Serial.print(get_vbus());
-            Serial.print("V, ");
-            Serial.print("Vbat: ");
-            Serial.print(get_vbat());
-            Serial.print("V, ");
-            Serial.print("Temp: ");
-            Serial.print(get_temp());
-            Serial.print(", ");
-            Serial.print("UTC: ");
-            Serial.print(utc);
-            Serial.print(", ");
-            Serial.print("Interval: ");
-            Serial.print(interval_collection_seconds);
-            Serial.print("s, ");
-            Serial.print("Index: ");
-            Serial.print(index_temp_telm);
-            Serial.print(", ");
-            Serial.print("State: ");
-            Serial.print(state);
-            Serial.print(", ");
-            Serial.print("Standby: ");
-            Serial.print(digitalRead(PINI_STANDBY_L));
-            Serial.print(", ");
-            Serial.print("Charge: ");
-            Serial.print(digitalRead(PINI_CHARGING_L));
-            Serial.println();
+            float vbus = get_vbus(10);
+            float vbat = get_vbat(10);
+            String status = "Vbus: ";
+            status += vbus;
+            status += "V, Vbat: ";
+            status += vbat;
+            status += "V, UTC: ";
+            status += utc;
+            status += ", Interval: ";
+            status += interval_collection_seconds;
+            status += "s, Index: ";
+            status += index_temp_telm;
+            status += ", State: ";
+            status += state;
+            status += ", Standby: ";
+            status += standby_l;
+            status += ", Charge: ";
+            status += charging_l;
+            Serial.println(status);
         }
         else if (input == "RESET")
         {
